@@ -1,7 +1,5 @@
-#![feature(absolute_path)]
-
 use std::io;
-use std::{path, path::Path};
+use std::path::Path;
 
 use askama::Template;
 use clap::Parser;
@@ -18,6 +16,10 @@ struct TreeTemplate {
 struct Args {
     #[clap(value_parser)]
     directory: String,
+
+    /// File to write generated output to (defaults to stdout)
+    #[clap(short, value_parser)]
+    output: Option<String>,
 }
 
 // #[derive(Debug)]
@@ -31,8 +33,13 @@ fn main() -> io::Result<()> {
     let args = Args::parse();
     let tree_data =
         serde_json::to_string(&process_dir(&Path::new(&args.directory)).unwrap()).unwrap();
+    let output = generate_output(tree_data);
 
-    println!("{}", generate_output(tree_data));
+    match args.output {
+        Some(filename) => std::fs::write(&filename, output).expect(&format!("Failed to write output to {}", filename)),
+        None => println!("{}", output),
+    }
+
     Ok(())
 }
 
