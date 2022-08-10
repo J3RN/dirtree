@@ -20,6 +20,10 @@ struct Args {
     /// File to write generated output to (defaults to stdout)
     #[clap(short, value_parser)]
     output: Option<String>,
+
+    /// Do not ignore entries that begin with '.'
+    #[clap(short, long, value_parser)]
+    all: bool
 }
 
 // #[derive(Debug)]
@@ -31,8 +35,9 @@ struct Node {
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
-    let tree_data =
-        serde_json::to_string(&process_dir(&Path::new(&args.directory)).unwrap()).unwrap();
+    let root_path = Path::new(&args.directory);
+    let entries = enumerate_dir(&root_path, args.all).unwrap();
+    let tree_data = serde_json::to_string(&entries).unwrap();
     let output = generate_output(tree_data);
 
     match args.output {
@@ -43,11 +48,12 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn process_dir(dir: &Path) -> io::Result<Node> {
+fn enumerate_dir(dir: &Path, include_hidden: bool) -> io::Result<Node> {
     let children = if dir.is_dir() {
         dir.read_dir()?
             .flatten()
-            .map(|file| process_dir(&file.path()))
+            .filter(|f| include_hidden || !f.file_name().into_string().unwrap().starts_with("."))
+            .map(|file| enumerate_dir(&file.path(), include_hidden))
             .flatten()
             .collect()
     } else {
